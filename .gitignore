@@ -2,3 +2,9 @@
 .ipynb_checkpoints
 .DS_Store
 .env
+
+# cache directory
+__pycache__
+
+# data directory
+Data/
