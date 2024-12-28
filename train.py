@@ -73,7 +73,7 @@ def main():
     np.random.seed(42)
     
     # Parameters
-    SPECTROGRAMS_DIR = 'path/to/spectrograms'  # Update this path
+    SPECTROGRAMS_DIR = '/Users/julienh/Desktop/SDS/SDS-CP018-music-classifier/Data/grayscale-Spectrograms'  # Update this path
     BATCH_SIZE = 32
     EPOCHS = 50
     IMG_HEIGHT = 128
@@ -86,8 +86,20 @@ def main():
     num_classes = len(genres)
     
     # Split data into train, validation, and test sets
-    train_paths, test_paths = train_test_split(spectrogram_paths, test_size=0.2, random_state=42)
-    train_paths, val_paths = train_test_split(train_paths, test_size=0.2, random_state=42)
+    train_paths, test_paths, train_labels, test_labels = train_test_split(
+        spectrogram_paths,
+        list(labels.values()),  # Pass the actual list of labels
+        test_size=0.2,
+        random_state=42,
+        stratify=list(labels.values())  # Stratify by genre labels
+    )
+    train_paths, val_paths, train_labels, val_labels = train_test_split(
+        train_paths,
+        train_labels,  # Use the corresponding labels for the second split
+        test_size=0.2,
+        random_state=42,
+        stratify=train_labels  # Stratify again for validation set
+    )
     
     print(f"Number of training samples: {len(train_paths)}")
     print(f"Number of validation samples: {len(val_paths)}")
@@ -96,16 +108,17 @@ def main():
     # Create data generators
     train_generator = SpectrogramSequenceGenerator(
         train_paths,
-        labels,
+        labels,  # Pass the labels dictionary here
         batch_size=BATCH_SIZE,
         dim=(IMG_HEIGHT, IMG_WIDTH),
         n_channels=CHANNELS,
-        n_classes=num_classes
+        n_classes=num_classes,
+        augment=True
     )
 
     val_generator = SpectrogramSequenceGenerator(
         val_paths,
-        labels,
+        labels,  # Pass the labels dictionary here
         batch_size=BATCH_SIZE,
         dim=(IMG_HEIGHT, IMG_WIDTH),
         n_channels=CHANNELS,
@@ -114,7 +127,7 @@ def main():
 
     test_generator = SpectrogramSequenceGenerator(
         test_paths,
-        labels,
+        labels,  # Pass the labels dictionary here
         batch_size=BATCH_SIZE,
         dim=(IMG_HEIGHT, IMG_WIDTH),
         n_channels=CHANNELS,
@@ -140,19 +153,19 @@ def main():
     
     # Callbacks
     callbacks = [
-        tf.keras.callbacks.EarlyStopping(
-            monitor='val_loss',
-            patience=5,
-            restore_best_weights=True
-        ),
         tf.keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss',
             factor=0.5,
-            patience=3,
-            min_lr=1e-6
+            patience=2,
+            min_lr=0.0001
+        ),
+        tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=10,
+            restore_best_weights=True
         ),
         tf.keras.callbacks.ModelCheckpoint(
-            'best_model.h5',
+            'best_model.keras',
             monitor='val_accuracy',
             save_best_only=True,
             mode='max'
@@ -194,8 +207,8 @@ def main():
     print(classification_report(y_true, y_pred, target_names=genres))
     
     # Save model
-    model.save('final_model.h5')
-    print("\nModel saved as 'final_model.h5'")
+    model.save('final_model.keras')
+    print("\nModel saved as 'final_model.keras'")
 
 if __name__ == "__main__":
     main() 
