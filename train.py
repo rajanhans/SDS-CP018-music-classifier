@@ -2,11 +2,13 @@ import tensorflow as tf
 from pathlib import Path
 import numpy as np
 from sklearn.model_selection import train_test_split
-from model.classifier import create_music_genre_classifier
-from model.data_generator import SpectrogramSequenceGenerator
+from model.classifier import create_music_genre_classifier, create_minimal_cnn_classifier, create_time_aware_classifier
+from model.data_generator import TimeSegmentedSpectrogramGenerator
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
+from collections import Counter
+import logging
 
 def prepare_data(spectrograms_dir):
     """
@@ -18,11 +20,25 @@ def prepare_data(spectrograms_dir):
     paths = []
     labels = {}
     
+    # Add counter for each genre
+    genre_counts = {}
+    
     for idx, genre in enumerate(genres):
         genre_path = Path(spectrograms_dir) / genre
-        for spec_path in genre_path.glob('*.png'):
+        genre_files = list(genre_path.glob('*.npy'))
+        genre_counts[genre] = len(genre_files)
+        
+        for spec_path in genre_files:
             paths.append(str(spec_path))
             labels[str(spec_path)] = idx
+    
+    # Print summary of files found
+    print("\nSpectrogram counts per genre:")
+    print("-" * 30)
+    for genre, count in genre_counts.items():
+        print(f"{genre:10} : {count:4d} files")
+    print("-" * 30)
+    print(f"Total files: {len(paths)}\n")
     
     return paths, labels, genres
 
@@ -73,17 +89,26 @@ def main():
     np.random.seed(42)
     
     # Parameters
-    SPECTROGRAMS_DIR = '/Users/julienh/Desktop/SDS/SDS-CP018-music-classifier/Data/grayscale-Spectrograms'  # Update this path
-    BATCH_SIZE = 32
+    SPECTROGRAMS_DIR = '/Users/julienh/Desktop/SDS/SDS-CP018-music-classifier/Data/mel_spectrograms_images'
+    BATCH_SIZE = 16  # Might need to reduce batch size due to larger data
     EPOCHS = 50
     IMG_HEIGHT = 128
     IMG_WIDTH = 128
     CHANNELS = 1
+    NUM_SEGMENTS = 7  # For 30-second audio split into 4-second segments
     
     # Prepare data
     print("Preparing data...")
     spectrogram_paths, labels, genres = prepare_data(SPECTROGRAMS_DIR)
     num_classes = len(genres)
+    
+    # Debug: Check the first file
+    first_file = spectrogram_paths[0]
+    print(f"\nChecking first file: {first_file}")
+    data = np.load(first_file)
+    print(f"Data shape: {data.shape}")
+    print(f"Data type: {data.dtype}")
+    print(f"Data range: [{data.min()}, {data.max()}]")
     
     # Split data into train, validation, and test sets
     train_paths, test_paths, train_labels, test_labels = train_test_split(
@@ -105,29 +130,57 @@ def main():
     print(f"Number of validation samples: {len(val_paths)}")
     print(f"Number of test samples: {len(test_paths)}")
     
+    # After first split
+    train_val_label_dist = Counter(train_labels)
+    test_label_dist = Counter(test_labels)
+    
+    print("\nLabel distribution after train/test split:")
+    print("-" * 50)
+    print("Train + Val set:")
+    for label, count in sorted(train_val_label_dist.items()):
+        print(f"Genre {genres[label]:10}: {count:4d} files ({count/len(train_labels)*100:.1f}%)")
+    print("\nTest set:")
+    for label, count in sorted(test_label_dist.items()):
+        print(f"Genre {genres[label]:10}: {count:4d} files ({count/len(test_labels)*100:.1f}%)")
+    print("-" * 50)
+    
+    # After second split
+    train_label_dist = Counter(train_labels)
+    val_label_dist = Counter(val_labels)
+    
+    print("\nFinal distribution after validation split:")
+    print("-" * 50)
+    print("Training set:")
+    for label, count in sorted(train_label_dist.items()):
+        print(f"Genre {genres[label]:10}: {count:4d} files ({count/len(train_labels)*100:.1f}%)")
+    print("\nValidation set:")
+    for label, count in sorted(val_label_dist.items()):
+        print(f"Genre {genres[label]:10}: {count:4d} files ({count/len(val_labels)*100:.1f}%)")
+    print("-" * 50)
+    
     # Create data generators
-    train_generator = SpectrogramSequenceGenerator(
+    train_generator = TimeSegmentedSpectrogramGenerator(
         train_paths,
-        labels,  # Pass the labels dictionary here
+        labels,
         batch_size=BATCH_SIZE,
         dim=(IMG_HEIGHT, IMG_WIDTH),
         n_channels=CHANNELS,
         n_classes=num_classes,
         augment=True
     )
-
-    val_generator = SpectrogramSequenceGenerator(
+    
+    val_generator = TimeSegmentedSpectrogramGenerator(
         val_paths,
-        labels,  # Pass the labels dictionary here
+        labels,
         batch_size=BATCH_SIZE,
         dim=(IMG_HEIGHT, IMG_WIDTH),
         n_channels=CHANNELS,
         n_classes=num_classes
     )
 
-    test_generator = SpectrogramSequenceGenerator(
+    test_generator = TimeSegmentedSpectrogramGenerator(
         test_paths,
-        labels,  # Pass the labels dictionary here
+        labels,
         batch_size=BATCH_SIZE,
         dim=(IMG_HEIGHT, IMG_WIDTH),
         n_channels=CHANNELS,
@@ -135,18 +188,15 @@ def main():
         shuffle=False
     )
     
-    # Create and compile model
-    print("Creating model...")
-    model = create_music_genre_classifier(
+    # Create model
+    model = create_time_aware_classifier(
         input_shape=(IMG_HEIGHT, IMG_WIDTH, CHANNELS),
         num_classes=num_classes,
-        embed_dim=256,
-        num_heads=8,
-        num_transformer_blocks=2
+        num_segments=NUM_SEGMENTS
     )
     
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),  # Slightly lower learning rate
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
@@ -156,16 +206,16 @@ def main():
         tf.keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss',
             factor=0.5,
-            patience=2,
-            min_lr=0.0001
+            patience=5,
+            min_lr=0.00001
         ),
         tf.keras.callbacks.EarlyStopping(
             monitor='val_loss',
-            patience=10,
+            patience=15,
             restore_best_weights=True
         ),
         tf.keras.callbacks.ModelCheckpoint(
-            'best_model.keras',
+            'best_cnn_model.keras',
             monitor='val_accuracy',
             save_best_only=True,
             mode='max'
@@ -174,6 +224,10 @@ def main():
     
     # Train model
     print("Training model...")
+    # Check the shapes
+    for i in range(min(3, len(train_generator))):
+        X, y = train_generator[i]
+        #print(f"Batch {i} shapes: X={X.shape}, y={y.shape}")
     history = model.fit(
         train_generator,
         validation_data=val_generator,

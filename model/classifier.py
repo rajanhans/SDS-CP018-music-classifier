@@ -45,3 +45,82 @@ def create_music_genre_classifier(
     model = Model(inputs=inputs, outputs=outputs)
     
     return model 
+
+def create_minimal_cnn_classifier(input_shape, num_classes):
+    """
+    Creates a simple CNN classifier for music genre classification
+    """
+    model = tf.keras.Sequential([
+        # Input layer
+        tf.keras.layers.Input(shape=input_shape),
+        
+        # First Conv Block
+        tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Dropout(0.25),
+        
+        # Second Conv Block
+        tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Dropout(0.25),
+        
+        # Third Conv Block
+        tf.keras.layers.Conv2D(128, (3, 3), padding='same', activation='relu'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Dropout(0.25),
+        
+        # Dense Layers
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(256, activation='relu'),
+        tf.keras.layers.Dropout(0.5),
+        tf.keras.layers.Dense(num_classes, activation='softmax')
+    ])
+    
+    return model 
+
+def create_time_aware_classifier(input_shape, num_classes, num_segments):
+    """
+    Creates a time-aware classifier that processes multiple segments of a spectrogram
+    input_shape: (height, width, channels) for each segment
+    num_segments: number of time segments per sample
+    """
+    # CNN to process each segment
+    segment_input = tf.keras.layers.Input(shape=input_shape)
+    x = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same')(segment_input)
+    x = tf.keras.layers.MaxPooling2D((2, 2))(x)
+    x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    x = tf.keras.layers.MaxPooling2D((2, 2))(x)
+    x = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    
+    # Create the time-distributed model
+    segment_model = tf.keras.Model(inputs=segment_input, outputs=x)
+    
+    # Main model that processes all segments
+    main_input = tf.keras.layers.Input(shape=(num_segments, *input_shape))
+    
+    # Apply the segment model to each time segment
+    processed_segments = tf.keras.layers.TimeDistributed(segment_model)(main_input)
+    
+    # Add attention mechanism
+    attention_output = tf.keras.layers.MultiHeadAttention(
+        num_heads=4, key_dim=32
+    )(processed_segments, processed_segments)
+    
+    # Add & Norm
+    x = tf.keras.layers.Add()([processed_segments, attention_output])
+    x = tf.keras.layers.LayerNormalization()(x)
+    
+    # Global temporal pooling
+    x = tf.keras.layers.GlobalAveragePooling1D()(x)
+    
+    # Final classification
+    x = tf.keras.layers.Dense(256, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.5)(x)
+    outputs = tf.keras.layers.Dense(num_classes, activation='softmax')(x)
+    
+    model = tf.keras.Model(inputs=main_input, outputs=outputs)
+    return model 
