@@ -89,11 +89,11 @@ def create_time_aware_classifier(input_shape, num_classes, num_segments):
     """
     # CNN to process each segment
     segment_input = tf.keras.layers.Input(shape=input_shape)
-    x = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same')(segment_input)
-    x = tf.keras.layers.MaxPooling2D((2, 2))(x)
-    x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-    x = tf.keras.layers.MaxPooling2D((2, 2))(x)
-    x = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+    
+    # Use the CNN model from cnn.py
+    cnn = create_cnn_model(input_shape)
+    
+    x = cnn(segment_input)
     x = tf.keras.layers.GlobalAveragePooling2D()(x)
     
     # Create the time-distributed model
@@ -105,17 +105,12 @@ def create_time_aware_classifier(input_shape, num_classes, num_segments):
     # Apply the segment model to each time segment
     processed_segments = tf.keras.layers.TimeDistributed(segment_model)(main_input)
     
-    # Add attention mechanism
-    attention_output = tf.keras.layers.MultiHeadAttention(
-        num_heads=4, key_dim=32
-    )(processed_segments, processed_segments)
-    
-    # Add & Norm
-    x = tf.keras.layers.Add()([processed_segments, attention_output])
-    x = tf.keras.layers.LayerNormalization()(x)
+    # Add attention mechanism using MultiHeadSelfAttention from attention.py
+    attention_layer = MultiHeadSelfAttention(embed_dim=128, num_heads=4)
+    attention_output = attention_layer(processed_segments)
     
     # Global temporal pooling
-    x = tf.keras.layers.GlobalAveragePooling1D()(x)
+    x = tf.keras.layers.GlobalAveragePooling1D()(attention_output)
     
     # Final classification
     x = tf.keras.layers.Dense(256, activation='relu')(x)

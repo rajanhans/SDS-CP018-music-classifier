@@ -91,6 +91,75 @@ class TimeSegmentedSpectrogramGenerator(tf.keras.utils.Sequence):
     def _augment_segments(self, segments):
         # Add time-sequence aware augmentations here
         # For example, small frequency shifts that are consistent across segments
-        if np.random.random() < 0.5:
-            segments = segments + np.random.normal(0, 0.01, segments.shape)
-        return segments 
+        if self.augment:
+            if np.random.random() < 0.5:
+                segments = self._random_frequency_shift(segments)
+            if np.random.random() < 0.5:
+                segments = self._add_noise(segments)
+            if np.random.random() < 0.5:
+                segments = self._time_stretch(segments)
+            if np.random.random() < 0.5:
+                segments = self._pitch_shift(segments)
+        return segments
+    
+    def _random_frequency_shift(self, segments):
+        # Shift the frequency of the segments by a random amount
+        max_shift = segments.shape[1] // 20  # Shift up to 5% of the frequency range
+        shift = np.random.randint(-max_shift, max_shift)
+        
+        # Create a copy to avoid modifying the original array
+        shifted_segments = np.zeros_like(segments)
+        
+        if shift > 0:
+            shifted_segments[:, shift:, :] = segments[:, :-shift, :]
+        elif shift < 0:
+            shifted_segments[:, :shift, :] = segments[:, -shift:, :]
+        else:
+            shifted_segments = segments
+        
+        return shifted_segments
+    
+    def _add_noise(self, segments, noise_factor=0.02):
+        # Add random noise to the segments
+        noise = np.random.normal(0, noise_factor, segments.shape)
+        noisy_segments = segments + noise
+        return noisy_segments
+    
+    def _time_stretch(self, segments, rate=None):
+        # Time stretch the segments by a small random amount
+        if rate is None:
+            rate = np.random.uniform(0.8, 1.2)  # Stretch between 80% and 120%
+        
+        stretched_segments = []
+        for segment in segments:
+            # Resize along the time axis (axis=1) to the target dimension
+            stretched_segment = tf.image.resize(
+                segment,
+                (segment.shape[0], self.dim[1]),  # Resize to target time dimension
+                method=tf.image.ResizeMethod.BILINEAR,
+                preserve_aspect_ratio=False  # Force exact dimensions
+            )
+            stretched_segments.append(stretched_segment)
+        
+        return tf.stack(stretched_segments)
+    
+    def _pitch_shift(self, segments, semitones=None):
+        # Pitch shift the segments by a small random amount
+        if semitones is None:
+            semitones = np.random.uniform(-2, 2)  # Shift up to 2 semitones
+        
+        # Convert semitones to a frequency ratio
+        ratio = 2 ** (semitones / 12.0)
+        
+        pitch_shifted_segments = []
+        for segment in segments:
+            # Resize along the frequency axis (axis=0) to the target dimension
+            pitch_shifted_segment = tf.image.resize(
+                segment,
+                (self.dim[0], segment.shape[1]),  # Resize to target frequency dimension
+                method=tf.image.ResizeMethod.BILINEAR,
+                preserve_aspect_ratio=False  # Force exact dimensions
+            )
+            pitch_shifted_segments.append(pitch_shifted_segment)
+        
+        return tf.stack(pitch_shifted_segments) 

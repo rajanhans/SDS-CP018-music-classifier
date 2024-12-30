@@ -91,11 +91,11 @@ def main():
     # Parameters
     SPECTROGRAMS_DIR = '/Users/julienh/Desktop/SDS/SDS-CP018-music-classifier/Data/mel_spectrograms_images'
     BATCH_SIZE = 16  # Might need to reduce batch size due to larger data
-    EPOCHS = 100
+    EPOCHS = 50
     IMG_HEIGHT = 128
     IMG_WIDTH = 128
     CHANNELS = 1
-    NUM_SEGMENTS = 7  # For 30-second audio split into 4-second segments
+    NUM_SEGMENTS = 7 # For 30-second audio split into 4-second segments
     
     # Prepare data
     print("Preparing data...")
