@@ -2,8 +2,8 @@ import tensorflow as tf
 from pathlib import Path
 import numpy as np
 from sklearn.model_selection import train_test_split
-from model.classifier import create_music_genre_classifier, create_minimal_cnn_classifier, create_time_aware_classifier
-from model.data_generator import TimeSegmentedSpectrogramGenerator
+from classifier import create_music_genre_classifier, create_minimal_cnn_classifier, create_time_aware_classifier
+from data_generator import TimeSegmentedSpectrogramGenerator
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
@@ -65,7 +65,7 @@ def plot_training_history(history):
     ax2.legend()
     
     plt.tight_layout()
-    plt.savefig('training_history.png')
+    plt.savefig('visualizations/training_history.png')
     plt.close()
 
 def plot_confusion_matrix(y_true, y_pred, classes):
@@ -80,7 +80,7 @@ def plot_confusion_matrix(y_true, y_pred, classes):
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
     plt.tight_layout()
-    plt.savefig('confusion_matrix.png')
+    plt.savefig('visualizations/confusion_matrix.png')
     plt.close()
 
 def main():
@@ -215,7 +215,7 @@ def main():
             restore_best_weights=True
         ),
         tf.keras.callbacks.ModelCheckpoint(
-            'best_cnn_model.keras',
+            'saved_models/best_cnn_model.keras',
             monitor='val_accuracy',
             save_best_only=True,
             mode='max'
@@ -224,10 +224,6 @@ def main():
     
     # Train model
     print("Training model...")
-    # Check the shapes
-    for i in range(min(3, len(train_generator))):
-        X, y = train_generator[i]
-        #print(f"Batch {i} shapes: X={X.shape}, y={y.shape}")
     history = model.fit(
         train_generator,
         validation_data=val_generator,
@@ -261,7 +257,7 @@ def main():
     print(classification_report(y_true, y_pred, target_names=genres))
     
     # Save model
-    model.save('final_model.keras')
+    model.save('saved_models/final_model.keras')
     print("\nModel saved as 'final_model.keras'")
 
 if __name__ == "__main__":

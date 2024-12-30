@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
-from .cnn import create_cnn_model
-from .attention import MultiHeadSelfAttention
+from cnn import create_cnn_model
+from attention import MultiHeadSelfAttention
 
 def create_music_genre_classifier(
     input_shape,
