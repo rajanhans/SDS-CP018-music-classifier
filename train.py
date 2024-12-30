@@ -91,7 +91,7 @@ def main():
     # Parameters
     SPECTROGRAMS_DIR = '/Users/julienh/Desktop/SDS/SDS-CP018-music-classifier/Data/mel_spectrograms_images'
     BATCH_SIZE = 16  # Might need to reduce batch size due to larger data
-    EPOCHS = 50
+    EPOCHS = 100
     IMG_HEIGHT = 128
     IMG_WIDTH = 128
     CHANNELS = 1
