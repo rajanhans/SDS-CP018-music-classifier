@@ -1,6 +1,6 @@
 streamlit
 numpy
-webrtc_streamer
+streamlit-webrtc
 AudioProcessorBase
 WebRtcMode
 joblib
