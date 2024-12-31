@@ -2,3 +2,15 @@
 .ipynb_checkpoints
 .DS_Store
 .env
+.venv
+
+# cache directory
+__pycache__
+
+# data directory
+Data/
+
+venv/
+
+*.keras
+*.h5
