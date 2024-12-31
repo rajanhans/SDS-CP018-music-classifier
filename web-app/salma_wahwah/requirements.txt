@@ -1,0 +1,10 @@
+streamlit
+numpy
+os
+webrtc_streamer
+AudioProcessorBase
+WebRtcMode
+joblib
+librosa==0.9.1
+soundfile
+tempfile
