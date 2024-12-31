@@ -12,13 +12,16 @@ import tensorflow as tf
 
 
 # Load the trained model
-model = tf.keras.models.load_model("music_genre_cnn_model_regularized.h5")
+model_path = os.path.join(os.getcwd(), 'music_genre_cnn_model_regularized.h5')
+scaler_path = os.path.join(os.getcwd(), 'scaler.pkl')
+label_encoder_path = os.path.join(os.getcwd(), 'label_encoder.pkl')
+
+# Load the trained model
+model = tf.keras.models.load_model(model_path)
 
 # Load the saved scaler and label encoder
-scaler = joblib.load('scaler.pkl')
-label_encoder = joblib.load('label_encoder.pkl')
-
-
+scaler = joblib.load(scaler_path)
+label_encoder = joblib.load(label_encoder_path)
 
 # Define class labels
 CLASS_LABELS = ['Classical', 'Jazz', 'Pop', 'Rock', 'Blues', 'Hip-hop', 'Reggae', 'Country', 'Electronic', 'Folk']
