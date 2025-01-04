@@ -13,7 +13,7 @@ from scipy.io.wavfile import write
 duration = 30  # Duration of the recording in seconds
 sample_rate = 44100  # Sample rate in Hz
 
-print(sd.query_devices())
+
 
 # Load the trained model
 model_path = os.path.join(os.getcwd(), 'music_genre_cnn_model_regularized.h5')
@@ -67,7 +67,12 @@ st.header("Record or Upload an Audio File to Classify the Genre")
 def record_audio():
     device = 1 
     st.info("Recording will start for 30 seconds. Please wait...")
-    audio_data = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=2, dtype='int16', device=device)
+    try:
+     audio_data = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=2, dtype='int16', device=1)
+    except sd.PortAudioError as e:
+        print(f"Error: {e}")
+    # Handle the error gracefully, maybe with a fallback or informative message
+    audio_data = None  # Or some other alternative
     sd.wait()
     st.success("Recording finished!")
     
