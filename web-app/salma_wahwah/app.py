@@ -63,8 +63,9 @@ st.header("Record or Upload an Audio File to Classify the Genre")
 
 # Function to record and save audio
 def record_audio():
+    device = 1 
     st.info("Recording will start for 30 seconds. Please wait...")
-    audio_data = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=2, dtype='int16', device=None)
+    audio_data = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=2, dtype='int16', device=device)
     sd.wait()
     st.success("Recording finished!")
     
