@@ -13,16 +13,19 @@ from scipy.io.wavfile import write
 duration = 30  # Duration of the recording in seconds
 sample_rate = 44100  # Sample rate in Hz
 
+# Load the trained model and scalers
+@st.cache_resource
+def load_model():
+    model_path = os.path.join(os.getcwd(), 'music_genre_cnn_model_regularized.h5')
+    scaler_path = os.path.join(os.getcwd(), 'scaler.pkl')
+    label_encoder_path = os.path.join(os.getcwd(), 'label_encoder.pkl')
 
+    model = tf.keras.models.load_model(model_path)
+    scaler = joblib.load(scaler_path)
+    label_encoder = joblib.load(label_encoder_path)
+    return model, scaler, label_encoder
 
-# Load the trained model
-model_path = os.path.join(os.getcwd(), 'music_genre_cnn_model_regularized.h5')
-scaler_path = os.path.join(os.getcwd(), 'scaler.pkl')
-label_encoder_path = os.path.join(os.getcwd(), 'label_encoder.pkl')
-
-model = tf.keras.models.load_model(model_path)
-scaler = joblib.load(scaler_path)
-label_encoder = joblib.load(label_encoder_path)
+model, scaler, label_encoder = load_model()
 
 # Function to extract features from an audio file
 def extract_features(file_path):
@@ -65,16 +68,15 @@ st.header("Record or Upload an Audio File to Classify the Genre")
 
 # Function to record and save audio
 def record_audio():
-    device = 1 
+    device = None  # Use default device
     st.info("Recording will start for 30 seconds. Please wait...")
     try:
-     audio_data = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=2, dtype='int16', device=1)
+        audio_data = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=2, dtype='int16', device=device)
+        sd.wait()
+        st.success("Recording finished!")
     except sd.PortAudioError as e:
-        print(f"Error: {e}")
-    # Handle the error gracefully, maybe with a fallback or informative message
-    audio_data = None  # Or some other alternative
-    sd.wait()
-    st.success("Recording finished!")
+        st.error(f"Error recording audio: {e}")
+        return None
     
     temp_audio_path = "recorded_audio.wav"
     write(temp_audio_path, sample_rate, audio_data)
@@ -84,21 +86,26 @@ def record_audio():
 # Button to start recording
 if st.button("Start Recording"):
     temp_audio_path = record_audio()
-    st.audio(temp_audio_path, format="audio/wav")
+    if temp_audio_path:
+        st.audio(temp_audio_path, format="audio/wav")
 
-    predicted_genre, confidence = validate_model(temp_audio_path)
-    if predicted_genre:
-        st.success(f"Predicted Genre: {predicted_genre}")
-        st.write(f"Confidence: {confidence:.2f}")
-    else:
-        st.error("Could not extract features from the recorded audio.")
+        predicted_genre, confidence = validate_model(temp_audio_path)
+        if predicted_genre:
+            st.success(f"Predicted Genre: {predicted_genre}")
+            st.write(f"Confidence: {confidence:.2f}")
+        else:
+            st.error("Could not extract features from the recorded audio.")
 
 # File upload option
 audio_file = st.file_uploader("Or upload an audio file", type=["wav", "mp3"])
 
 if audio_file:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-        temp_audio.write(audio_file.getvalue())
+        if audio_file.name.endswith(".mp3"):
+            audio_data, sr = librosa.load(audio_file, sr=None)
+            sf.write(temp_audio.name, audio_data, sr)
+        else:
+            temp_audio.write(audio_file.getvalue())
         temp_audio_path = temp_audio.name
 
     st.audio(temp_audio_path, format="audio/wav")
