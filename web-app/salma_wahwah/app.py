@@ -11,7 +11,7 @@ from scipy.io.wavfile import write
 
 # Set the parameters
 duration = 30  # Duration of the recording in seconds
-sample_rate = 22500  # Sample rate in Hz
+sample_rate = 44100  # Sample rate in Hz
 
 # Load the trained model
 model_path = os.path.join(os.getcwd(), 'music_genre_cnn_model_regularized.h5')

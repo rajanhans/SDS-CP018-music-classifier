@@ -6,3 +6,4 @@ librosa==0.9.1
 soundfile
 tensorflow
 sounddevice 
+portaudio
