@@ -68,20 +68,32 @@ st.header("Record or Upload an Audio File to Classify the Genre")
 
 # Function to record and save audio
 def record_audio():
-    
-    st.info("Recording will start for 30 seconds. Please wait...")
     try:
-        audio_data = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=2, dtype='int16')
+        st.info("Recording will start for 30 seconds. Please wait...")
+        devices = sd.query_devices()
+        input_device = None
+
+        for idx, device in enumerate(devices):
+            if device['max_input_channels'] > 0:  # Look for devices with input capabilities
+                input_device = idx
+                break
+
+        if input_device is None:
+            st.error("No audio input device found.")
+            return None
+
+        audio_data = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=2, dtype='int16', device=input_device)
         sd.wait()
         st.success("Recording finished!")
+        
+        temp_audio_path = "recorded_audio.wav"
+        write(temp_audio_path, sample_rate, audio_data)
+        st.success(f"Audio saved to {temp_audio_path}")
+        return temp_audio_path
+
     except sd.PortAudioError as e:
         st.error(f"Error recording audio: {e}")
         return None
-    
-    temp_audio_path = "recorded_audio.wav"
-    write(temp_audio_path, sample_rate, audio_data)
-    st.success(f"Audio saved to {temp_audio_path}")
-    return temp_audio_path
 
 # Button to start recording
 if st.button("Start Recording"):
