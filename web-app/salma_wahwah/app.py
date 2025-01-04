@@ -13,6 +13,8 @@ from scipy.io.wavfile import write
 duration = 30  # Duration of the recording in seconds
 sample_rate = 44100  # Sample rate in Hz
 
+print(sd.query_devices())
+
 # Load the trained model
 model_path = os.path.join(os.getcwd(), 'music_genre_cnn_model_regularized.h5')
 scaler_path = os.path.join(os.getcwd(), 'scaler.pkl')
