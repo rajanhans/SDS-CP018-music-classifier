@@ -9,3 +9,6 @@ __pycache__
 
 # data directory
 Data/
+Misc/
+Test/
+notebooks/rajan-hans/test/
