@@ -13,3 +13,8 @@ Misc/
 notebooks/rajan-hans/testfile/
 notebooks/rajan-hans/model/
 notebooks/rajan-hans/demo/
+
+venv/
+
+*.keras
+*.h5
