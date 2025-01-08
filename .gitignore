@@ -10,7 +10,6 @@ __pycache__
 # data directory
 Data/
 Misc/
-Test/
 notebooks/rajan-hans/testfile/
 notebooks/rajan-hans/model/
 notebooks/rajan-hans/demo/
