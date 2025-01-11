@@ -1,113 +1,188 @@
 import streamlit as st
-import librosa
 import numpy as np
-import pandas as pd
-from joblib import load
+import librosa
+import joblib
+from keras.models import load_model
+import tempfile
 
-# Load the pre-trained XGBoost model, scaler, and label encoder
-xgb_model = load('genre_class_model_xgboost.joblib')
-scaler = load('scaler.joblib')
-label_encoder = load('label_encoder.joblib')
+# -------------------------------------------------------------------------
+# 1) Feature Extraction (same 57 features you used in training)
+#    This function should match exactly how you extracted features
+#    in your XGBoost/CNN training scripts.
+# -------------------------------------------------------------------------
+def extract_all_features_from_wav(wav_file):
+    """
+    Extract 57 features based on your training code:
+    (1) Chroma STFT mean,var
+    (2) RMS mean,var
+    (3) Spectral Centroid mean,var
+    (4) Spectral Bandwidth mean,var
+    (5) Spectral Rolloff mean,var
+    (6) Zero Crossing Rate mean,var
+    (7) Harmony mean,var
+    (8) Perceptual mean,var
+    (9) Tempo
+    (10) 20 MFCC means + 20 MFCC vars
+    """
+    try:
+        # Load audio (force mono)
+        y, sr = librosa.load(wav_file, sr=None, mono=True)
 
-# Define the genre names corresponding to the encoded labels
-genre_names = ['blues','classical', 'country', 'disco', 'hiphop', 'jazz', 'metal', 'pop', 'reggae', 'rock']  
+        # 1. Spectral Bandwidth
+        sb = librosa.feature.spectral_bandwidth(y=y, sr=sr)
+        sb_mean, sb_var = np.mean(sb), np.var(sb)
 
-# Function to extract features from a wav file
-def extract_features_from_wav(wav_file):
-    # Load audio file using librosa
-    y, sr = librosa.load(wav_file, sr=None)  # sr=None preserves the original sample rate
-    
-    # Extract various audio features
-    
-    # Spectral Bandwidth
-    spectral_bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr)
-    spectral_bandwidth_mean = np.mean(spectral_bandwidth)
-    
-    # Chroma STFT (Short-Time Fourier Transform)
-    chroma_stft = librosa.feature.chroma_stft(y=y, sr=sr)
-    chroma_stft_mean = np.mean(chroma_stft)
-    chroma_stft_var = np.var(chroma_stft)
-    
-    # MFCCs (Mel-frequency cepstral coefficients)
-    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=6)
-    mfcc1_mean = np.mean(mfcc[0])
-    mfcc1_var = np.var(mfcc[0])
-    mfcc4_mean = np.mean(mfcc[3])
-    mfcc5_var = np.var(mfcc[4])
-    mfcc6_mean = np.mean(mfcc[5])
-    
-    # Roll-off (Spectral roll-off point)
-    rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, roll_percent=0.85)
-    rolloff_mean = np.mean(rolloff)
-    rolloff_var = np.var(rolloff)
-    
-    # Root Mean Square (RMS)
-    rms = librosa.feature.rms(y=y)
-    rms_var = np.var(rms)
-    
-    # Spectral Centroid
-    spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
-    spectral_centroid_var = np.var(spectral_centroid)
-    
-    # Tempo (beats per minute)
-    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-    
-    # Harmony (harmonic-to-noise ratio)
-    harmony = librosa.effects.harmonic(y)
-    harmony_mean = np.mean(harmony)
-    
-    # **Perceptual Variance** (you may need to define this based on your specific requirement)
-    perceptr_var = np.var(rms)  # Using RMS variance as a proxy for perceptual variance
-    
-    # Combine all extracted features
-    features = [
-        perceptr_var, spectral_bandwidth_mean, chroma_stft_mean, mfcc4_mean, chroma_stft_var, 
-        mfcc1_var, rolloff_var, rms_var, rolloff_mean, mfcc1_mean, 
-        spectral_centroid_var, mfcc5_var, mfcc6_mean, tempo, harmony_mean
-    ]
-    
-    return features
+        # 2. Chroma STFT
+        chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+        chroma_mean, chroma_var = np.mean(chroma), np.var(chroma)
 
-# Streamlit App
+        # 3. RMS
+        rms = librosa.feature.rms(y=y)
+        rms_mean, rms_var = np.mean(rms), np.var(rms)
+
+        # 4. Spectral Centroid
+        sc = librosa.feature.spectral_centroid(y=y, sr=sr)
+        sc_mean, sc_var = np.mean(sc), np.var(sc)
+
+        # 5. Spectral Rolloff
+        rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, roll_percent=0.85)
+        rolloff_mean, rolloff_var = np.mean(rolloff), np.var(rolloff)
+
+        # 6. Zero-Crossing Rate
+        zcr = librosa.feature.zero_crossing_rate(y=y)
+        zcr_mean, zcr_var = np.mean(zcr), np.var(zcr)
+
+        # 7. Harmony
+        harmony = librosa.effects.harmonic(y)
+        harmony_mean, harmony_var = np.mean(harmony), np.var(harmony)
+
+        # 8. Perceptual (using RMS)
+        perceptr_mean, perceptr_var = rms_mean, rms_var
+
+        # 9. Tempo (convert from shape (1,) to scalar float)
+        tempo_array, _ = librosa.beat.beat_track(y=y, sr=sr)
+        tempo = float(tempo_array)
+
+        # 10. MFCC
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=20)
+        mfcc_means = [np.mean(mfcc[i]) for i in range(20)]
+        mfcc_vars = [np.var(mfcc[i]) for i in range(20)]
+
+        features = [
+            chroma_mean, chroma_var,
+            rms_mean, rms_var,
+            sc_mean, sc_var,
+            sb_mean, sb_var,
+            rolloff_mean, rolloff_var,
+            zcr_mean, zcr_var,
+            harmony_mean, harmony_var,
+            perceptr_mean, perceptr_var,
+            tempo
+        ] + mfcc_means + mfcc_vars
+
+        return np.array(features)
+
+    except Exception as e:
+        st.error(f"Error extracting features: {e}")
+        return None
+
+# -------------------------------------------------------------------------
+# 2) Streamlit App
+# -------------------------------------------------------------------------
 def main():
-    st.title("Music Genre Prediction from WAV File")
-    
-    st.write("""
-    This Streamlit app allows you to upload a .wav file and predicts its genre based on the features extracted from the audio.
-    """)
-    
-    # Upload WAV file
-    uploaded_file = st.file_uploader("Upload a .wav file", type=["wav"])
-    
-    if uploaded_file is not None:
-        # Extract features from the uploaded file
-        st.write("Extracting features...")
-        extracted_features = extract_features_from_wav(uploaded_file)
-        
-        # Convert extracted features into a DataFrame
-        reduced_feature_columns = [
-            "perceptr_var", "spectral_bandwidth_mean", "chroma_stft_mean", "mfcc4_mean", 
-            "chroma_stft_var", "mfcc1_var", "rolloff_var", "rms_var", "rolloff_mean", 
-            "mfcc1_mean", "spectral_centroid_var", "mfcc5_var", "mfcc6_mean", "tempo", 
-            "harmony_mean"
-        ]
-        extracted_features_df = pd.DataFrame([extracted_features], columns=reduced_feature_columns)
-        
-        # Scale the extracted features using the saved scaler
-        X_scaled = scaler.transform(extracted_features_df)
-        
-        # Predict the genre using the trained model
-        predicted_label_encoded = xgb_model.predict(X_scaled)
-        
-        # Decode the predicted label
-        predicted_label = label_encoder.inverse_transform(predicted_label_encoded)
-        
-        # Map the encoded label to the actual genre name
-        predicted_genre_name = genre_names[predicted_label[0]]  # Map the predicted label to the actual genre name
-        
-        # Display the predicted genre
-        st.write(f"The predicted genre of the song is: **{predicted_genre_name}**")
+    st.title("Music Genre Classification")
 
-# Run the Streamlit app
+    # File uploader for .wav
+    uploaded_file = st.file_uploader("Upload a WAV file", type=["wav"])
+
+    # Radio button: user chooses XGBoost or CNN
+    model_choice = st.radio(
+        "Select your model:",
+        ("XGBoost", "CNN")
+    )
+
+    # Predict button
+    if st.button("Predict Genre"):
+        if uploaded_file is None:
+            st.warning("Please upload a WAV file.")
+            return
+
+        # Write the uploaded WAV to a temporary file
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp.write(uploaded_file.read())
+            tmp_filename = tmp.name
+
+        # Extract 57 features
+        features = extract_all_features_from_wav(tmp_filename)
+        if features is None:
+            return  # We already showed an error if extraction failed
+
+        # Reshape to (1, 57)
+        features_reshaped = features.reshape(1, -1)
+
+        # -------------------------------------
+        # If user chooses XGBoost
+        # -------------------------------------
+        if model_choice == "XGBoost":
+            try:
+                # Load XGBoost model, scaler, label encoder
+                xgb_model = joblib.load("genre_class_model_xgboost_full.joblib")
+                xgb_scaler = joblib.load("scaler.joblib")
+                xgb_label_encoder = joblib.load("label_encoder.joblib")
+            except Exception as e:
+                st.error(f"Error loading XGBoost model/scaler/encoder: {e}")
+                return
+
+            # Scale
+            try:
+                features_scaled = xgb_scaler.transform(features_reshaped)
+            except Exception as e:
+                st.error(f"Error scaling features for XGBoost: {e}")
+                return
+
+            # Predict
+            try:
+                prediction = xgb_model.predict(features_scaled)
+                predicted_genre = xgb_label_encoder.inverse_transform(prediction)[0]
+                st.success(f"Predicted Genre (XGBoost): {predicted_genre}")
+            except Exception as e:
+                st.error(f"Error predicting with XGBoost: {e}")
+
+        # -------------------------------------
+        # If user chooses CNN
+        # -------------------------------------
+        else:  # CNN
+            try:
+                # Load CNN model (Keras .h5), joblib scalers, joblib label encoder
+                cnn_model = load_model("music_genre_cnn_model.h5")
+                cnn_scaler = joblib.load("scaler_cnn.joblib")
+                cnn_label_encoder = joblib.load("label_encoder_cnn.joblib")
+            except Exception as e:
+                st.error(f"Error loading CNN model/scaler/encoder: {e}")
+                return
+
+            # Scale
+            try:
+                features_scaled = cnn_scaler.transform(features_reshaped)
+            except Exception as e:
+                st.error(f"Error scaling features for CNN: {e}")
+                return
+
+            # Reshape for Conv1D: (1, 57, 1)
+            try:
+                features_scaled_cnn = features_scaled.reshape((1, features_scaled.shape[1], 1))
+            except Exception as e:
+                st.error(f"Error reshaping for CNN input: {e}")
+                return
+
+            # Predict
+            try:
+                y_pred = cnn_model.predict(features_scaled_cnn)
+                predicted_class_idx = np.argmax(y_pred, axis=1)
+                predicted_genre = cnn_label_encoder.inverse_transform(predicted_class_idx)[0]
+                st.success(f"Predicted Genre (CNN): {predicted_genre}")
+            except Exception as e:
+                st.error(f"Error predicting with CNN: {e}")
+
 if __name__ == "__main__":
     main()

@@ -7,14 +7,17 @@
 # cache directory
 __pycache__
 
-# data directory
-Data/
-Misc/
-notebooks/rajan-hans/testfile/
-notebooks/rajan-hans/model/
-notebooks/rajan-hans/demo/
 
-venv/
 
 *.keras
 *.h5
+*.txt
+*.joblib
+*.pkl
+
+
+# added by rajan
+Data/
+Misc/
+notebooks/rajan-hans/demo/
+venv/
