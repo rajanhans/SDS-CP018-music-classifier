@@ -11,7 +11,7 @@ __pycache__
 
 *.keras
 *.h5
-*.joblib
+
 *.pkl
 *.wav
 *.bat
