@@ -1,0 +1,13 @@
+streamlit
+numpy
+streamlit-webrtc==0.47.9
+joblib
+librosa
+soundfile
+tensorflow
+sounddevice 
+pyaudio
+ipykernel
+xgboost
+seaborn
+scikit-learn
