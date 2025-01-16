@@ -91,7 +91,7 @@ def extract_all_features_from_wav(wav_file):
 # 2) Streamlit App
 # -------------------------------------------------------------------------
 def main():
-    st.title("Music Genre Classification")
+    st.title("Rajan's Music Genre Classification")
 
     # File uploader for .wav
     uploaded_file = st.file_uploader("Upload a WAV file", type=["wav"])
